@@ -1,0 +1,132 @@
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
+public class FeatureTagInjector {
+
+    private static final String EXCEL_FILE = "tag-map.xlsx";
+    private static final String INPUT_DIR = "src/test/resources/features";
+    private static final String OUTPUT_DIR = "target/updated-features";
+
+    private static final Map<String, String> scenarioTagMap = new HashMap<>();
+    private static final Map<String, String> examplesTagMap = new HashMap<>();
+
+    public static void main(String[] args) throws IOException {
+        loadTagMapFromExcel();
+        processFeatureFiles();
+    }
+
+    private static void loadTagMapFromExcel() throws IOException {
+        try (FileInputStream fis = new FileInputStream(EXCEL_FILE);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+
+                String type = row.getCell(0).getStringCellValue().trim().toLowerCase();
+                String keyword = row.getCell(1).getStringCellValue().trim().toLowerCase();
+                String tag = row.getCell(2).getStringCellValue().trim();
+
+                if (!keyword.isEmpty() && !tag.isEmpty()) {
+                    if ("scenario".equals(type)) {
+                        scenarioTagMap.put(keyword, tag);
+                    } else if ("examples".equals(type)) {
+                        examplesTagMap.put(keyword, tag);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void processFeatureFiles() throws IOException {
+        Files.walk(Paths.get(INPUT_DIR))
+                .filter(path -> path.toString().endsWith(".feature"))
+                .forEach(FeatureTagInjector::processFeatureFile);
+    }
+
+    private static void processFeatureFile(Path inputFile) {
+        try {
+            List<String> lines = Files.readAllLines(inputFile);
+            List<String> updatedLines = new ArrayList<>();
+
+            for (int i = 0; i < lines.size(); i++) {
+                String trimmed = lines.get(i).trim();
+
+                // Handle Scenario and Scenario Outline
+                if (trimmed.startsWith("Scenario:") || trimmed.startsWith("Scenario Outline:")) {
+                    String scenarioName = trimmed.split(":", 2)[1].trim();
+                    String tag = getTagForScenario(scenarioName);
+                    if (tag != null && (i == 0 || !lines.get(i - 1).trim().startsWith("@"))) {
+                        updatedLines.add(tag);
+                    }
+                    updatedLines.add(lines.get(i));
+                    continue;
+                }
+
+                // Handle Examples blocks
+                if (trimmed.startsWith("Examples:")) {
+                    String exampleLabel = trimmed.substring("Examples:".length()).trim();
+                    String tag = getTagForExamples(exampleLabel);
+                    if (tag != null && (i == 0 || !lines.get(i - 1).trim().startsWith("@"))) {
+                        updatedLines.add(tag);
+                    }
+                    updatedLines.add(lines.get(i));
+                    continue;
+                }
+
+                // Default
+                updatedLines.add(lines.get(i));
+            }
+
+            Path relativePath = Paths.get(INPUT_DIR).relativize(inputFile);
+            Path outputFile = Paths.get(OUTPUT_DIR).resolve(relativePath);
+            Files.createDirectories(outputFile.getParent());
+            Files.write(outputFile, updatedLines);
+            System.out.println("Generated: " + outputFile);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String getTagForScenario(String name) {
+        for (String keyword : scenarioTagMap.keySet()) {
+            if (name.toLowerCase().contains(keyword)) {
+                return scenarioTagMap.get(keyword);
+            }
+        }
+        return null;
+    }
+
+    private static String getTagForExamples(String label) {
+        for (String keyword : examplesTagMap.keySet()) {
+            if (label.toLowerCase().contains(keyword)) {
+                return examplesTagMap.get(keyword);
+            }
+        }
+        return null;
+    }
+}
+
+
+Match Type
+Keyword
+Tag
+scenario
+login
+@login
+scenario
+checkout
+@checkout
+examples
+valid
+@valid
+examples
+invalid
+@inval
+
+
