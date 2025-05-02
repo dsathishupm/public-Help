@@ -1,0 +1,187 @@
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class ExcelTagInjector {
+
+    private static final String EXCEL_FILE = "tag-map.xlsx"; // Path to Excel file
+    private static final String FEATURES_DIR = "src/test/resources/features"; // Feature files location
+
+    private static final Map<String, String> tagMap = new HashMap<>();
+
+    public static void main(String[] args) throws IOException {
+        loadTagMapFromExcel();
+        processFeatureFiles();
+    }
+
+    private static void loadTagMapFromExcel() throws IOException {
+        try (FileInputStream fis = new FileInputStream(EXCEL_FILE);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue; // Skip header
+
+                Cell keywordCell = row.getCell(0);
+                Cell tagCell = row.getCell(1);
+
+                if (keywordCell != null && tagCell != null) {
+                    String keyword = keywordCell.getStringCellValue().trim();
+                    String tag = tagCell.getStringCellValue().trim();
+                    if (!keyword.isEmpty() && !tag.isEmpty()) {
+                        tagMap.put(keyword.toLowerCase(), tag);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void processFeatureFiles() throws IOException {
+        Files.walk(Paths.get(FEATURES_DIR))
+                .filter(path -> path.toString().endsWith(".feature"))
+                .forEach(ExcelTagInjector::processFeatureFile);
+    }
+
+    private static void processFeatureFile(Path filePath) {
+        try {
+            List<String> lines = Files.readAllLines(filePath);
+            List<String> updatedLines = new ArrayList<>();
+
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (line.trim().startsWith("Scenario:")) {
+                    String scenarioName = line.trim().substring("Scenario:".length()).trim();
+                    String tagToApply = getTagForScenario(scenarioName);
+
+                    if (tagToApply != null) {
+                        // Check if there's already a tag line above
+                        if (i == 0 || !lines.get(i - 1).trim().startsWith("@")) {
+                            updatedLines.add(tagToApply);
+                        }
+                    }
+                }
+                updatedLines.add(line);
+            }
+
+            Files.write(filePath, updatedLines);
+            System.out.println("Updated: " + filePath);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String getTagForScenario(String scenarioName) {
+        for (String keyword : tagMap.keySet()) {
+            if (scenarioName.toLowerCase().contains(keyword)) {
+                return tagMap.get(keyword);
+            }
+        }
+        return null;
+    }
+}
+
+
+--------
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class FeatureTagGenerator {
+
+    private static final String EXCEL_FILE = "tag-map.xlsx";
+    private static final String INPUT_DIR = "src/test/resources/features";
+    private static final String OUTPUT_DIR = "target/updated-features";
+
+    private static final Map<String, String> tagMap = new HashMap<>();
+
+    public static void main(String[] args) throws IOException {
+        loadTagMapFromExcel();
+        processFeatureFiles();
+    }
+
+    private static void loadTagMapFromExcel() throws IOException {
+        try (FileInputStream fis = new FileInputStream(EXCEL_FILE);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+
+                Cell keywordCell = row.getCell(0);
+                Cell tagCell = row.getCell(1);
+
+                if (keywordCell != null && tagCell != null) {
+                    String keyword = keywordCell.getStringCellValue().trim();
+                    String tag = tagCell.getStringCellValue().trim();
+                    if (!keyword.isEmpty() && !tag.isEmpty()) {
+                        tagMap.put(keyword.toLowerCase(), tag);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void processFeatureFiles() throws IOException {
+        Files.walk(Paths.get(INPUT_DIR))
+                .filter(path -> path.toString().endsWith(".feature"))
+                .forEach(FeatureTagGenerator::processFeatureFile);
+    }
+
+    private static void processFeatureFile(Path inputFile) {
+        try {
+            List<String> lines = Files.readAllLines(inputFile);
+            List<String> updatedLines = new ArrayList<>();
+
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (line.trim().startsWith("Scenario:")) {
+                    String scenarioName = line.trim().substring("Scenario:".length()).trim();
+                    String tagToApply = getTagForScenario(scenarioName);
+
+                    if (tagToApply != null) {
+                        // Add tag line only if no tag above
+                        if (i == 0 || !lines.get(i - 1).trim().startsWith("@")) {
+                            updatedLines.add(tagToApply);
+                        }
+                    }
+                }
+                updatedLines.add(line);
+            }
+
+            // Write to new output location
+            Path relativePath = Paths.get(INPUT_DIR).relativize(inputFile);
+            Path outputFile = Paths.get(OUTPUT_DIR).resolve(relativePath);
+            Files.createDirectories(outputFile.getParent());
+            Files.write(outputFile, updatedLines);
+            System.out.println("Generated: " + outputFile);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String getTagForScenario(String scenarioName) {
+        for (String keyword : tagMap.keySet()) {
+            if (scenarioName.toLowerCase().contains(keyword)) {
+                return tagMap.get(keyword);
+            }
+        }
+        return null;
+    }
+}
+
+
+-----
+
+
+
