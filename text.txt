@@ -1,0 +1,48 @@
+import java.io.*;
+import java.nio.file.*;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class CucumberTagInjector {
+
+    public static void main(String[] args) throws IOException {
+        String directoryPath = "src/test/resources/features"; // Adjust to your feature file path
+
+        Files.walk(Paths.get(directoryPath))
+                .filter(path -> path.toString().endsWith(".feature"))
+                .forEach(CucumberTagInjector::processFile);
+    }
+
+    private static void processFile(Path filePath) {
+        try {
+            List<String> lines = Files.readAllLines(filePath);
+            List<String> updatedLines = lines.stream()
+                    .flatMap(line -> {
+                        if (line.trim().startsWith("Scenario:")) {
+                            String scenarioName = line.trim().substring("Scenario:".length()).trim();
+                            String tag = determineTag(scenarioName);
+                            if (!tag.isEmpty()) {
+                                return Stream.of("", tag, line);
+                            }
+                        }
+                        return Stream.of(line);
+                    })
+                    .collect(Collectors.toList());
+
+            Files.write(filePath, updatedLines);
+            System.out.println("Updated file: " + filePath);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String determineTag(String scenarioName) {
+        if (scenarioName.toLowerCase().contains("login")) {
+            return "@login";
+        } else if (scenarioName.toLowerCase().contains("checkout")) {
+            return "@checkout";
+        }
+        return "";
+    }
+}
