@@ -1,0 +1,53 @@
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import java.time.Duration;
+
+public class OutlookEmailAutomation {
+    public static void main(String[] args) throws InterruptedException {
+        // Set ChromeDriver path if not in system PATH
+        System.setProperty("webdriver.chrome.driver", "path/to/chromedriver");
+
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--start-maximized");
+
+        WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(15));
+
+        // Step 1: Login to Outlook Web
+        driver.get("https://outlook.office.com/mail/");
+
+        // Wait and perform login manually if MFA is enabled, or automate login if possible
+        System.out.println("Please login manually if prompted... waiting 60 seconds.");
+        Thread.sleep(60000); // Adjust or use WebDriverWait for better control
+
+        // Step 2: Click on "New message"
+        WebElement newMessageBtn = driver.findElement(By.cssSelector("button[aria-label='New mail']"));
+        newMessageBtn.click();
+        Thread.sleep(3000); // Wait for compose window
+
+        // Step 3: Fill in the email fields
+        driver.findElement(By.cssSelector("input[aria-label='To']")).sendKeys("recipient@example.com");
+        driver.findElement(By.cssSelector("input[aria-label='Add a subject']")).sendKeys("Test Email from Selenium");
+        driver.findElement(By.cssSelector("div[aria-label='Message body']")).sendKeys("This is an automated email sent using Selenium WebDriver in Java.");
+
+        // Step 4: Click Send
+        driver.findElement(By.cssSelector("button[aria-label='Send']")).click();
+
+        System.out.println("Email sent successfully.");
+
+        // Close browser
+        Thread.sleep(5000);
+        driver.quit();
+    }
+}
+
+<dependencies>
+    <dependency>
+        <groupId>org.seleniumhq.selenium</groupId>
+        <artifactId>selenium-java</artifactId>
+        <version>4.19.1</version>
+    </dependency>
+</dependencies>
