@@ -130,3 +130,79 @@ invalid
 @inval
 
 
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
+public class RecursiveFolderDiff {
+
+    public static void main(String[] args) throws IOException {
+        Path folder1 = Paths.get("path/to/folder1"); // Replace with actual path
+        Path folder2 = Paths.get("path/to/folder2"); // Replace with actual path
+
+        Map<String, Path> folder1Files = getAllFiles(folder1);
+        Map<String, Path> folder2Files = getAllFiles(folder2);
+
+        Set<String> allRelativePaths = new HashSet<>();
+        allRelativePaths.addAll(folder1Files.keySet());
+        allRelativePaths.addAll(folder2Files.keySet());
+
+        for (String relativePath : allRelativePaths) {
+            Path file1 = folder1Files.get(relativePath);
+            Path file2 = folder2Files.get(relativePath);
+
+            System.out.println("\nComparing: " + relativePath);
+            if (file1 == null) {
+                System.out.println("  Only in folder2: " + relativePath);
+            } else if (file2 == null) {
+                System.out.println("  Only in folder1: " + relativePath);
+            } else {
+                showLineDifferences(file1, file2);
+            }
+        }
+    }
+
+    private static Map<String, Path> getAllFiles(Path root) throws IOException {
+        Map<String, Path> fileMap = new HashMap<>();
+        if (!Files.exists(root)) return fileMap;
+
+        Files.walk(root)
+            .filter(Files::isRegularFile)
+            .forEach(path -> {
+                String relative = root.relativize(path).toString().replace("\\", "/");
+                fileMap.put(relative, path);
+            });
+
+        return fileMap;
+    }
+
+    private static void showLineDifferences(Path file1, Path file2) throws IOException {
+        try (
+            BufferedReader reader1 = Files.newBufferedReader(file1);
+            BufferedReader reader2 = Files.newBufferedReader(file2)
+        ) {
+            String line1, line2;
+            int lineNum = 1;
+            boolean diffFound = false;
+
+            while ((line1 = reader1.readLine()) != null | (line2 = reader2.readLine()) != null) {
+                if (!Objects.equals(line1, line2)) {
+                    System.out.println("  Line " + lineNum + " differs:");
+                    System.out.println("    Folder1: " + (line1 != null ? line1 : "<no line>"));
+                    System.out.println("    Folder2: " + (line2 != null ? line2 : "<no line>"));
+                    diffFound = true;
+                }
+                lineNum++;
+            }
+
+            if (!diffFound) {
+                System.out.println("  No differences found.");
+            }
+        }
+    }
+}
+
+
+
+
