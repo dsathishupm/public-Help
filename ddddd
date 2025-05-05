@@ -1,3 +1,92 @@
+----------
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
+public class RecursiveFolderDiffToText {
+
+    public static void main(String[] args) throws IOException {
+        Path folder1 = Paths.get("path/to/folder1"); // Replace with actual path
+        Path folder2 = Paths.get("path/to/folder2"); // Replace with actual path
+        Path outputFile = Paths.get("FileDifferences.txt");
+
+        Map<String, Path> folder1Files = getAllFiles(folder1);
+        Map<String, Path> folder2Files = getAllFiles(folder2);
+
+        Set<String> allRelativePaths = new TreeSet<>();
+        allRelativePaths.addAll(folder1Files.keySet());
+        allRelativePaths.addAll(folder2Files.keySet());
+
+        try (BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
+            for (String relativePath : allRelativePaths) {
+                Path file1 = folder1Files.get(relativePath);
+                Path file2 = folder2Files.get(relativePath);
+
+                writer.write("\n===== Comparing: " + relativePath + " =====\n");
+
+                if (file1 == null) {
+                    writer.write("Only in folder2\n");
+                } else if (file2 == null) {
+                    writer.write("Only in folder1\n");
+                } else {
+                    writeLineDifferences(file1, file2, writer);
+                }
+            }
+
+            System.out.println("Comparison written to " + outputFile.toAbsolutePath());
+        }
+    }
+
+    private static Map<String, Path> getAllFiles(Path root) throws IOException {
+        Map<String, Path> fileMap = new HashMap<>();
+        if (!Files.exists(root)) return fileMap;
+
+        Files.walk(root)
+            .filter(Files::isRegularFile)
+            .filter(path -> {
+                String name = path.getFileName().toString().toLowerCase();
+                return !name.endsWith(".xls") && !name.endsWith(".xlsx"); // Ignore Excel files
+            })
+            .forEach(path -> {
+                String relative = root.relativize(path).toString().replace("\\", "/");
+                fileMap.put(relative, path);
+            });
+
+        return fileMap;
+    }
+
+    private static void writeLineDifferences(Path file1, Path file2, BufferedWriter writer) throws IOException {
+        try (
+            BufferedReader reader1 = Files.newBufferedReader(file1);
+            BufferedReader reader2 = Files.newBufferedReader(file2)
+        ) {
+            String line1, line2;
+            int lineNum = 1;
+            boolean diffFound = false;
+
+            while ((line1 = reader1.readLine()) != null | (line2 = reader2.readLine()) != null) {
+                if (!Objects.equals(line1, line2)) {
+                    writer.write("Line " + lineNum + " differs:\n");
+                    writer.write("  Folder1: " + (line1 != null ? line1 : "<no line>") + "\n");
+                    writer.write("  Folder2: " + (line2 != null ? line2 : "<no line>") + "\n");
+                    diffFound = true;
+                }
+                lineNum++;
+            }
+
+            if (!diffFound) {
+                writer.write("No differences found.\n");
+            }
+        }
+    }
+}
+
+
+-----
+
+
+
+
 
 private static Map<String, Path> getAllFiles(Path root) throws IOException {
     Map<String, Path> fileMap = new HashMap<>();
