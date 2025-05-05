@@ -1,3 +1,27 @@
+
+private static Map<String, Path> getAllFiles(Path root) throws IOException {
+    Map<String, Path> fileMap = new HashMap<>();
+    if (!Files.exists(root)) return fileMap;
+
+    Files.walk(root)
+        .filter(Files::isRegularFile)
+        .filter(path -> {
+            String name = path.getFileName().toString().toLowerCase();
+            return !name.endsWith(".xls") && !name.endsWith(".xlsx");
+        })
+        .forEach(path -> {
+            String relative = root.relativize(path).toString().replace("\\", "/");
+            fileMap.put(relative, path);
+        });
+
+    return fileMap;
+}
+
+
+
+
+
+
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
