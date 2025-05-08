@@ -1,0 +1,15 @@
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+while ($true) {
+    # Get current cursor position
+    $pos = [System.Windows.Forms.Cursor]::Position
+
+    # Slightly move the cursor and then move it back
+    [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($pos.X + 1, $pos.Y)
+    Start-Sleep -Milliseconds 100
+    [System.Windows.Forms.Cursor]::Position = $pos
+
+    # Wait for 4 minutes before next activity (change as needed)
+    Start-Sleep -Seconds 240
+}
