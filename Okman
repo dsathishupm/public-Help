@@ -1,0 +1,95 @@
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.methods.*;
+import org.apache.http.impl.client.*;
+import org.apache.http.util.EntityUtils;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.json.*;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+public class ZephyrScaleAttachmentDownloader {
+
+    static final String JIRA_BASE_URL = "https://your-jira-server.com";
+    static final String TEST_CYCLE_KEY = "CYCLE-123";
+    static final String USERNAME = "your_username";
+    static final String PASSWORD = "your_password";
+
+    static final String AUTH_HEADER = "Basic " +
+            Base64.getEncoder().encodeToString((USERNAME + ":" + PASSWORD).getBytes(StandardCharsets.UTF_8));
+
+    public static void main(String[] args) throws Exception {
+        CloseableHttpClient client = HttpClients.createDefault();
+
+        // Step 1: Get all test executions for the cycle
+        String executionsUrl = JIRA_BASE_URL + "/rest/atm/1.0/testexecutions?testCycleKey=" + TEST_CYCLE_KEY;
+        HttpGet request = new HttpGet(executionsUrl);
+        request.setHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+
+        CloseableHttpResponse response = client.execute(request);
+        String responseString = EntityUtils.toString(response.getEntity());
+        JSONArray executions = new JSONArray(responseString);
+
+        for (int i = 0; i < executions.length(); i++) {
+            JSONObject execution = executions.getJSONObject(i);
+            String executionKey = execution.getString("key");
+            System.out.println("Fetching attachments for execution: " + executionKey);
+
+            downloadAttachmentsForExecution(client, executionKey);
+        }
+
+        client.close();
+    }
+
+    private static void downloadAttachmentsForExecution(CloseableHttpClient client, String executionKey) throws IOException {
+        String url = JIRA_BASE_URL + "/rest/atm/1.0/testexecutions/" + executionKey + "/attachments";
+        HttpGet request = new HttpGet(url);
+        request.setHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+
+        CloseableHttpResponse response = client.execute(request);
+        String responseString = EntityUtils.toString(response.getEntity());
+        JSONArray attachments = new JSONArray(responseString);
+
+        for (int i = 0; i < attachments.length(); i++) {
+            JSONObject attachment = attachments.getJSONObject(i);
+            String fileName = attachment.getString("filename");
+            String contentUrl = attachment.getString("content");
+
+            System.out.println("Downloading: " + fileName);
+            downloadFile(client, JIRA_BASE_URL + contentUrl, "downloads/" + fileName);
+        }
+    }
+
+    private static void downloadFile(CloseableHttpClient client, String fileUrl, String targetPath) throws IOException {
+        HttpGet request = new HttpGet(fileUrl);
+        request.setHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+
+        CloseableHttpResponse response = client.execute(request);
+        try (InputStream in = response.getEntity().getContent();
+             FileOutputStream out = new FileOutputStream(targetPath)) {
+
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                out.write(buffer, 0, n);
+            }
+        }
+    }
+}
+
+
+
+<dependencies>
+    <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.5.13</version>
+    </dependency>
+    <dependency>
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>20210307</version>
+    </dependency>
+</dependencies>
