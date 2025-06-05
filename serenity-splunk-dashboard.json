@@ -1,0 +1,50 @@
+{
+  "dashboard": {
+    "title": "Serenity BDD Test Automation Dashboard",
+    "description": "Live monitoring of Serenity BDD test automation logs with Splunk",
+    "panels": [
+      {
+        "title": "Test Execution Summary",
+        "type": "viz.singlevalue",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" | stats count(eval(message=\"Test Passed\")) as Passed, count(eval(message=\"Test Failed\")) as Failed, count(eval(message=\"Test Skipped\")) as Skipped | eval Total=Passed+Failed+Skipped"
+        }
+      },
+      {
+        "title": "Test Status Trend Over Time",
+        "type": "viz.line",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" | timechart span=1m count by message | where message IN (\"Test Passed\", \"Test Failed\", \"Test Skipped\")"
+        }
+      },
+      {
+        "title": "Top 10 Failed Test Cases",
+        "type": "viz.table",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" message=\"Test Failed\" | stats count by test_name, exception | sort -count | head 10"
+        }
+      },
+      {
+        "title": "Test Execution Duration",
+        "type": "viz.table",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" | transaction test_name startswith=\"Test Started\" endswith=\"Test Ended\" | eval duration_in_sec = duration | stats avg(duration_in_sec), max(duration_in_sec), min(duration_in_sec) by test_name"
+        }
+      },
+      {
+        "title": "Environment-wise Execution",
+        "type": "viz.bar",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" | stats count by environment, message"
+        }
+      },
+      {
+        "title": "Drilldown: Test Case Logs",
+        "type": "viz.table",
+        "search": {
+          "query": "index=serenity_logs sourcetype=\"serenity_json\" | search test_name=\"YourTestCaseName\" | table _time, level, test_name, message, exception"
+        }
+      }
+    ]
+  }
+}
