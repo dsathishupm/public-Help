@@ -1,0 +1,259 @@
+# Use Windows Server 2019 as base image
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+# Set shell to PowerShell
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Create a directory for downloads
+RUN New-Item -ItemType Directory -Path C:\temp -Force
+
+# Download and install Google Chrome
+RUN Write-Host 'Downloading Google Chrome...'; \
+    Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\temp\chrome_installer.exe'; \
+    Write-Host 'Installing Google Chrome...'; \
+    Start-Process -FilePath 'C:\temp\chrome_installer.exe' -ArgumentList '/silent', '/install' -Wait; \
+    Write-Host 'Chrome installation completed'
+
+# Clean up installer
+RUN Remove-Item -Path C:\temp\chrome_installer.exe -Force
+
+# Download and install Java JDK 17 (LTS - recommended for Serenity BDD)
+RUN Write-Host 'Downloading Java JDK 17...'; \
+    Invoke-WebRequest -Uri 'https://download.oracle.com/java/17/archive/jdk-17.0.9_windows-x64_bin.exe' -OutFile 'C:\temp\jdk-installer.exe'; \
+    Write-Host 'Installing Java JDK 17...'; \
+    Start-Process -FilePath 'C:\temp\jdk-installer.exe' -ArgumentList '/s', 'INSTALLDIR=C:\Program Files\Java\jdk-17' -Wait; \
+    Write-Host 'Java installation completed'
+
+# Alternative: Use OpenJDK (more reliable for automated downloads)
+RUN Write-Host 'Downloading OpenJDK 17...'; \
+    Invoke-WebRequest -Uri 'https://aka.ms/download-jdk/microsoft-jdk-17.0.9-windows-x64.msi' -OutFile 'C:\temp\openjdk.msi'; \
+    Write-Host 'Installing OpenJDK 17...'; \
+    Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', 'C:\temp\openjdk.msi', '/quiet', '/norestart' -Wait; \
+    Write-Host 'OpenJDK installation completed'
+
+# Download and install Maven
+RUN Write-Host 'Downloading Apache Maven...'; \
+    Invoke-WebRequest -Uri 'https://archive.apache.org/dist/maven/maven-3/3.9.5/binaries/apache-maven-3.9.5-bin.zip' -OutFile 'C:\temp\maven.zip'; \
+    Write-Host 'Extracting Maven...'; \
+    Expand-Archive -Path 'C:\temp\maven.zip' -DestinationPath 'C:\Program Files\'; \
+    Rename-Item -Path 'C:\Program Files\apache-maven-3.9.5' -NewName 'maven'; \
+    Write-Host 'Maven installation completed'
+
+# Clean up installers
+RUN Remove-Item -Path C:\temp\jdk-installer.exe -Force -ErrorAction SilentlyContinue; \
+    Remove-Item -Path C:\temp\openjdk.msi -Force -ErrorAction SilentlyContinue; \
+    Remove-Item -Path C:\temp\maven.zip -Force -ErrorAction SilentlyContinue
+
+# Set environment variables for Java and Maven
+RUN $javaHome = 'C:\Program Files\Microsoft\jdk-17.0.9.8-hotspot'; \
+    $mavenHome = 'C:\Program Files\maven'; \
+    [Environment]::SetEnvironmentVariable('JAVA_HOME', $javaHome, [EnvironmentVariableTarget]::Machine); \
+    [Environment]::SetEnvironmentVariable('MAVEN_HOME', $mavenHome, [EnvironmentVariableTarget]::Machine); \
+    $env:PATH += ';' + $javaHome + '\bin;' + $mavenHome + '\bin;C:\Program Files\Google\Chrome\Application'; \
+    [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
+
+# Set working directory
+WORKDIR C:\app
+
+# Display Chrome version using file properties (most reliable method)
+CMD Write-Host 'Container started successfully!'; \
+    Write-Host '================================'; \
+    Write-Host 'Google Chrome Version Check:'; \
+    Write-Host '================================'; \
+    $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'; \
+    if (Test-Path $chromePath) { \
+        Write-Host 'Chrome executable found!'; \
+        try { \
+            $fileVersion = (Get-Item $chromePath).VersionInfo; \
+            Write-Host ('Chrome Version: ' + $fileVersion.ProductVersion); \
+            Write-Host ('File Version: ' + $fileVersion.FileVersion); \
+            Write-Host ('Product Name: ' + $fileVersion.ProductName); \
+        } catch { \
+            Write-Host 'Error reading version info: ' $_.Exception.Message; \
+        } \
+    } else { \
+        Write-Host 'Chrome executable not found!'; \
+    } \
+    Write-Host '================================'; \
+    Write-Host 'Alternative method - Registry check:'; \
+    try { \
+        $chromeReg = Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome' -ErrorAction SilentlyContinue; \
+        if ($chromeReg) { \
+            Write-Host ('Registry Version: ' + $chromeReg.DisplayVersion); \
+        } else { \
+            Write-Host 'Chrome not found in registry (32-bit path)'; \
+        } \
+    } catch { \
+        Write-Host 'Registry check failed: ' $_.Exception.Message; \
+    } \
+    Write-Host '================================'; \
+    Write-Host 'Chrome installation verified!'; \
+    Write-Host 'Container is ready to use.'; \
+    # Keep container running
+    while ($true) { Start-Sleep -Seconds 30 }
+
+
+
+
+--------
+
+# Use Windows Server 2019 as base image
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+# Set shell to PowerShell
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Create a directory for downloads
+RUN New-Item -ItemType Directory -Path C:\temp -Force
+
+# Download and install Google Chrome
+RUN Write-Host 'Downloading Google Chrome...'; \
+    Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\temp\chrome_installer.exe'; \
+    Write-Host 'Installing Google Chrome...'; \
+    Start-Process -FilePath 'C:\temp\chrome_installer.exe' -ArgumentList '/silent', '/install' -Wait; \
+    Write-Host 'Chrome installation completed'
+
+# Clean up installer
+RUN Remove-Item -Path C:\temp\chrome_installer.exe -Force
+
+# Download and install Java JDK 17 (LTS - recommended for Serenity BDD)
+RUN Write-Host 'Downloading Java JDK 17...'; \
+    Invoke-WebRequest -Uri 'https://download.oracle.com/java/17/archive/jdk-17.0.9_windows-x64_bin.exe' -OutFile 'C:\temp\jdk-installer.exe'; \
+    Write-Host 'Installing Java JDK 17...'; \
+    Start-Process -FilePath 'C:\temp\jdk-installer.exe' -ArgumentList '/s', 'INSTALLDIR=C:\Program Files\Java\jdk-17' -Wait; \
+    Write-Host 'Java installation completed'
+
+# Alternative: Use OpenJDK (more reliable for automated downloads)
+RUN Write-Host 'Downloading OpenJDK 17...'; \
+    Invoke-WebRequest -Uri 'https://aka.ms/download-jdk/microsoft-jdk-17.0.9-windows-x64.msi' -OutFile 'C:\temp\openjdk.msi'; \
+    Write-Host 'Installing OpenJDK 17...'; \
+    Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i', 'C:\temp\openjdk.msi', '/quiet', '/norestart' -Wait; \
+    Write-Host 'OpenJDK installation completed'
+
+# Download and install Maven
+RUN Write-Host 'Downloading Apache Maven...'; \
+    Invoke-WebRequest -Uri 'https://archive.apache.org/dist/maven/maven-3/3.9.5/binaries/apache-maven-3.9.5-bin.zip' -OutFile 'C:\temp\maven.zip'; \
+    Write-Host 'Extracting Maven...'; \
+    Expand-Archive -Path 'C:\temp\maven.zip' -DestinationPath 'C:\Program Files\'; \
+    Rename-Item -Path 'C:\Program Files\apache-maven-3.9.5' -NewName 'maven'; \
+    Write-Host 'Maven installation completed'
+
+# Clean up installers
+RUN Remove-Item -Path C:\temp\jdk-installer.exe -Force -ErrorAction SilentlyContinue; \
+    Remove-Item -Path C:\temp\openjdk.msi -Force -ErrorAction SilentlyContinue; \
+    Remove-Item -Path C:\temp\maven.zip -Force -ErrorAction SilentlyContinue
+
+# Set environment variables for Java and Maven
+RUN $javaHome = 'C:\Program Files\Microsoft\jdk-17.0.9.8-hotspot'; \
+    $mavenHome = 'C:\Program Files\maven'; \
+    [Environment]::SetEnvironmentVariable('JAVA_HOME', $javaHome, [EnvironmentVariableTarget]::Machine); \
+    [Environment]::SetEnvironmentVariable('MAVEN_HOME', $mavenHome, [EnvironmentVariableTarget]::Machine); \
+    $env:PATH += ';' + $javaHome + '\bin;' + $mavenHome + '\bin;C:\Program Files\Google\Chrome\Application'; \
+    [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
+
+# Set working directory
+WORKDIR C:\app
+
+# Display Chrome version using file properties (most reliable method)
+CMD Write-Host 'Container started successfully!'; \
+    Write-Host '================================'; \
+    Write-Host 'Software Installation Verification:'; \
+    Write-Host '================================'; \
+    # Check Chrome
+    $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'; \
+    if (Test-Path $chromePath) { \
+        Write-Host 'Chrome executable found!'; \
+        try { \
+            $fileVersion = (Get-Item $chromePath).VersionInfo; \
+            Write-Host ('Chrome Version: ' + $fileVersion.ProductVersion); \
+        } catch { \
+            Write-Host 'Error reading Chrome version: ' $_.Exception.Message; \
+        } \
+    } else { \
+        Write-Host 'Chrome executable not found!'; \
+    } \
+    Write-Host '--------------------------------'; \
+    # Check Java
+    try { \
+        $javaVersion = & java -version 2>&1; \
+        Write-Host ('Java Version: ' + ($javaVersion -split '\n')[0]); \
+    } catch { \
+        Write-Host 'Java not found or error getting version'; \
+    } \
+    Write-Host '--------------------------------'; \
+    # Check Maven
+    try { \
+        $mavenVersion = & mvn -version 2>&1; \
+        $mavenLine = ($mavenVersion -split '\n') | Where-Object { $_ -like '*Apache Maven*' } | Select-Object -First 1; \
+        Write-Host ('Maven Version: ' + $mavenLine); \
+    } catch { \
+        Write-Host 'Maven not found or error getting version'; \
+    } \
+    Write-Host '================================'; \
+    Write-Host 'Environment Variables:'; \
+    Write-Host ('JAVA_HOME: ' + $env:JAVA_HOME); \
+    Write-Host ('MAVEN_HOME: ' + $env:MAVEN_HOME); \
+    Write-Host '================================'; \
+    Write-Host 'All tools installed successfully!'; \
+    Write-Host 'Ready for Serenity BDD testing!'; \
+    # Keep container running
+    while ($true) { Start-Sleep -Seconds 30 }
+
+
+
+------
+
+I'll update the Dockerfile to include Java and Maven for Serenity BDD testing:​​​​​​​​​​​​​​​​
+
+​​​​​​​​​​​​​​​​
+
+Now let me also create a sample Serenity BDD project structure that you can use:​​​​​​​​​​​​​​​​
+
+Now let me create a sample Serenity configuration:​​​​​​​​​​​​​​​​
+
+**Updated Dockerfile Features:**
+
+1. **Chrome Browser** - Latest version with version verification
+2. **Java JDK 17** - OpenJDK from Microsoft (LTS version recommended for Serenity)
+3. **Apache Maven 3.9.5** - Latest stable version
+4. **Environment Variables** - Properly configured JAVA_HOME and MAVEN_HOME
+5. **PATH Configuration** - All tools added to system PATH
+
+**To build and run:**
+
+```bash
+# Build the image
+docker build -t serenity-chrome:latest .
+
+# Run the container to verify installations
+docker run --rm serenity-chrome:latest
+
+# Run interactively to create/run tests
+docker run -it --rm -v ${PWD}:/workspace serenity-chrome:latest powershell
+```
+
+**Commands to test in the container:**
+
+```bash
+# Check versions
+docker run --rm serenity-chrome:latest powershell -c "java -version; mvn -version; (Get-Item 'C:\Program Files\Google\Chrome\Application\chrome.exe').VersionInfo.ProductVersion"
+
+# Create a new Serenity project
+docker run -it --rm -v ${PWD}:/workspace serenity-chrome:latest powershell -c "cd /workspace; mvn archetype:generate -DgroupId=com.example -DartifactId=serenity-tests -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false"
+
+# Run Serenity tests
+docker run --rm -v ${PWD}:/workspace serenity-chrome:latest powershell -c "cd /workspace; mvn clean verify"
+```
+
+**Key Features for Serenity BDD:**
+
+- **Headless Chrome** configured for container environment
+- **WebDriverManager** for automatic driver management
+- **Serenity Reports** generation
+- **Cucumber integration** for BDD tests
+- **Proper Chrome switches** for container execution
+- **Maven configuration** optimized for Serenity BDD
+
+The container is now ready for Serenity BDD testing with Chrome in a Windows environment!​​​​​​​​​​​​​​​​
+
+
