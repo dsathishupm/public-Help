@@ -1,0 +1,36 @@
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+# Set shell to PowerShell
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Create a directory for downloads
+RUN New-Item -ItemType Directory -Path C:\temp -Force
+
+# Download and install Google Chrome
+RUN Write-Host 'Downloading Google Chrome...'; \
+    Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\temp\chrome_installer.exe'; \
+    Write-Host 'Installing Google Chrome...'; \
+    Start-Process -FilePath 'C:\temp\chrome_installer.exe' -ArgumentList '/silent', '/install' -Wait; \
+    Write-Host 'Chrome installation completed'
+
+# Clean up installer
+RUN Remove-Item -Path C:\temp\chrome_installer.exe -Force
+
+# Add Chrome to PATH (Chrome is typically installed in Program Files)
+RUN $env:PATH += ';C:\Program Files\Google\Chrome\Application'; \
+    [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
+
+# Set working directory
+WORKDIR C:\app
+
+# Display Chrome version when container starts
+CMD Write-Host 'Container started successfully!'; \
+    Write-Host '================================'; \
+    Write-Host 'Google Chrome Version:'; \
+    Write-Host '================================'; \
+    & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --version; \
+    Write-Host '================================'; \
+    Write-Host 'Chrome installation verified!'; \
+    Write-Host 'Container is ready to use.'; \
+    # Keep container running
+    while ($true) { Start-Sleep -Seconds 30 }
