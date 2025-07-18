@@ -1,0 +1,87 @@
+# Use Windows Server 2019 as base image
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+
+# Set shell to PowerShell
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Create a directory for downloads
+RUN New-Item -ItemType Directory -Path C:\temp -Force
+
+# Download and install Google Chrome
+RUN Write-Host 'Downloading Google Chrome...'; \
+    Invoke-WebRequest -Uri 'https://dl.google.com/chrome/install/latest/chrome_installer.exe' -OutFile 'C:\temp\chrome_installer.exe'; \
+    Write-Host 'Installing Google Chrome...'; \
+    Start-Process -FilePath 'C:\temp\chrome_installer.exe' -ArgumentList '/silent', '/install' -Wait; \
+    Write-Host 'Chrome installation completed'
+
+# Clean up installer
+RUN Remove-Item -Path C:\temp\chrome_installer.exe -Force
+
+# Add Chrome to PATH (Chrome is typically installed in Program Files)
+RUN $env:PATH += ';C:\Program Files\Google\Chrome\Application'; \
+    [Environment]::SetEnvironmentVariable('PATH', $env:PATH, [EnvironmentVariableTarget]::Machine)
+
+# Set working directory
+WORKDIR C:\app
+
+# Display Chrome version when container starts
+CMD Write-Host 'Container started successfully!'; \
+    Write-Host '================================'; \
+    Write-Host 'Google Chrome Version:'; \
+    Write-Host '================================'; \
+    try { \
+        $chromeVersion = & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --version 2>&1; \
+        if ($chromeVersion) { \
+            Write-Host $chromeVersion; \
+        } else { \
+            Write-Host 'Chrome version command executed but no output received'; \
+        } \
+    } catch { \
+        Write-Host 'Error getting Chrome version: ' $_.Exception.Message; \
+    } \
+    Write-Host '================================'; \
+    Write-Host 'Chrome installation verified!'; \
+    Write-Host 'Container is ready to use.'; \
+    # Keep container running
+    while ($true) { Start-Sleep -Seconds 30 }
+
+
+
+
+
+can see from your screenshot that you're running the Docker command but it's not returning the Chrome version. The issue is likely that you're trying to run Chrome with flags that don't work together properly, or the container is hanging.
+
+Let me provide you with a corrected approach:​​​​​​​​​​​​​​​​
+
+Now, let me also provide you with a simpler command that should work:
+
+**Try this simpler approach:**
+
+1. **First, run the container interactively:**
+```cmd
+docker run -it --rm windows-chrome:latest powershell
+```
+
+2. **Then inside the container, run these commands one by one:**
+```powershell
+# Check if Chrome is installed
+Test-Path "C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+# Get Chrome version
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+
+# Alternative method to get version
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Google Chrome" | Select-Object DisplayVersion
+```
+
+**Or try this one-liner that should work:**
+```cmd
+docker run --rm windows-chrome:latest powershell -c "Write-Host 'Chrome Version:'; & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --version; Write-Host 'Done'"
+```
+
+**If that still doesn't work, try this alternative:**
+```cmd
+docker run --rm windows-chrome:latest powershell -c "Write-Host 'Checking Chrome installation...'; if (Test-Path 'C:\Program Files\Google\Chrome\Application\chrome.exe') { Write-Host 'Chrome found, getting version...'; & 'C:\Program Files\Google\Chrome\Application\chrome.exe' --version } else { Write-Host 'Chrome not found at expected location' }"
+```
+
+The issue you're experiencing is common with Windows containers where Chrome might not output to the console properly. The updated Dockerfile includes better error handling to help diagnose what's happening.​​​​​​​​​​​​​​​​
