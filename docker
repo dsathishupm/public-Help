@@ -34,3 +34,51 @@ CMD Write-Host 'Container started successfully!'; \
     Write-Host 'Container is ready to use.'; \
     # Keep container running
     while ($true) { Start-Sleep -Seconds 30 }
+
+
+
+
+I'll create a Dockerfile for Windows Server 2019 that installs Chrome and displays the version. Here's the complete solution:​​​​​​​​​​​​​​​​
+
+Here's how to build and run this Docker container:
+
+**1. Build the Docker image:**
+```bash
+docker build -t windows-chrome:latest .
+```
+
+**2. Run the container:**
+```bash
+docker run -it --rm windows-chrome:latest
+```
+
+**Key features of this Dockerfile:**
+
+- **Base Image**: Uses `mcr.microsoft.com/windows/servercore:ltsc2019` (Windows Server 2019)
+- **PowerShell Shell**: Sets PowerShell as the default shell for better Windows compatibility
+- **Silent Installation**: Downloads and installs Chrome silently without user interaction
+- **Version Display**: Shows the Chrome version in the console output when the container starts
+- **Path Configuration**: Adds Chrome to the system PATH for easy access
+- **Cleanup**: Removes the installer file to keep the image size smaller
+
+**Expected Console Output:**
+```
+Container started successfully!
+================================
+Google Chrome Version:
+================================
+Google Chrome 120.0.6099.129
+================================
+Chrome installation verified!
+Container is ready to use.
+```
+
+**Additional Usage Options:**
+
+If you want to run Chrome with specific arguments or in headless mode, you can override the CMD:
+```bash
+docker run -it --rm windows-chrome:latest powershell -c "& 'C:\Program Files\Google\Chrome\Application\chrome.exe' --headless --version"
+```
+
+**Note**: This container will keep running indefinitely. If you just want to see the Chrome version and exit, you can modify the CMD section to remove the infinite loop at the end.​​​​​​​​​​​​​​​​
+
