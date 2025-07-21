@@ -1,0 +1,11 @@
+index=dev sourcetype="your_sourcetype"
+| spath path=feature output=feature
+| spath path=name output=scenario
+| spath path=Client output=client
+| search client="CAX"
+| spath path=testSteps{} output=steps
+| mvexpand steps
+| spath input=steps
+| eval step_name=spath(steps, "name"),
+        step_result=spath(steps, "result")
+| table client, feature, scenario, step_name, step_result
