@@ -1,3 +1,69 @@
+<dashboard version="1.1" theme="light">
+  <label>Serenity BDD Test Scenario Dashboard</label>
+
+  <!-- Client Filter Dropdown -->
+  <form>
+    <input type="dropdown" token="client_tok">
+      <label>Select Client</label>
+      <choice value="CAX">CAX</choice>
+      <choice value="CAY">CAY</choice>
+      <default>CAX</default>
+    </input>
+  </form>
+
+  <!-- Scenario Summary Table -->
+  <row>
+    <panel>
+      <title>Scenario Summary - Click to View Steps</title>
+      <table>
+        <search>
+          <query>
+            index=dev sourcetype="your_sourcetype"
+            | spath path=Client output=client
+            | spath path=name output=scenario
+            | spath path=result output=scenario_result
+            | spath path=feature output=feature
+            | search client="$client_tok$"
+            | table client, feature, scenario, scenario_result
+          </query>
+        </search>
+        <drilldown>
+          <set token="selected_scenario">$row.scenario$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+
+  <!-- Step Details Panel (Only if scenario is selected) -->
+  <row>
+    <panel depends="$selected_scenario$">
+      <title>Steps for: $selected_scenario$</title>
+      <table>
+        <search>
+          <query>
+            index=dev sourcetype="your_sourcetype"
+            | spath path=Client output=client
+            | spath path=name output=scenario
+            | spath path=testSteps{} output=steps
+            | search client="$client_tok$" scenario="$selected_scenario$"
+            | mvexpand steps
+            | spath input=steps
+            | eval step_name=spath(steps, "name"),
+                    step_result=spath(steps, "result"),
+                    step_duration=spath(steps, "duration"),
+                    api_request=spath(steps, "apiRequest"),
+                    api_response=spath(steps, "apiResponse")
+            | table step_name, step_result, step_duration, api_request, api_response
+          </query>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>
+
+
+
+
 <dashboard>
   <label>Serenity BDD Scenario Dashboard with Drilldown</label>
 
