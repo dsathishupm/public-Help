@@ -1,0 +1,856 @@
+# Bruno API Test Framework - Data-Driven with HTML Reports
+
+## Project Structure
+
+```
+bruno-api-tests/
+├── collections/
+│   ├── api-tests/
+│   │   ├── bruno.json
+│   │   ├── environments/
+│   │   │   ├── dev.bru
+│   │   │   ├── staging.bru
+│   │   │   └── prod.bru
+│   │   ├── tests/
+│   │   │   ├── users/
+│   │   │   │   ├── get-users.bru
+│   │   │   │   ├── create-user.bru
+│   │   │   │   ├── update-user.bru
+│   │   │   │   └── delete-user.bru
+│   │   │   ├── auth/
+│   │   │   │   ├── login.bru
+│   │   │   │   └── refresh-token.bru
+│   │   │   └── products/
+│   │   │       ├── get-products.bru
+│   │   │       └── create-product.bru
+│   │   └── data/
+│   │       ├── users.json
+│   │       ├── products.json
+│   │       └── auth-tokens.json
+├── scripts/
+│   ├── test-runner.js
+│   ├── report-generator.js
+│   └── data-loader.js
+├── reports/
+│   └── html/
+├── package.json
+└── README.md
+```
+
+## 1. Package.json Setup
+
+```json
+{
+  "name": "bruno-api-test-framework",
+  "version": "1.0.0",
+  "description": "Data-driven API testing framework with Bruno",
+  "scripts": {
+    "test": "node scripts/test-runner.js",
+    "test:dev": "node scripts/test-runner.js --env dev",
+    "test:staging": "node scripts/test-runner.js --env staging",
+    "test:prod": "node scripts/test-runner.js --env prod",
+    "report": "node scripts/report-generator.js",
+    "test-and-report": "npm run test && npm run report"
+  },
+  "dependencies": {
+    "@usebruno/cli": "^1.0.0",
+    "fs-extra": "^11.1.1",
+    "handlebars": "^4.7.8",
+    "moment": "^2.29.4",
+    "yargs": "^17.7.2",
+    "chalk": "^4.1.2"
+  }
+}
+```
+
+## 2. Bruno Collection Configuration
+
+### bruno.json
+```json
+{
+  "version": "1",
+  "name": "API Test Suite",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
+```
+
+### Environment Files
+
+#### environments/dev.bru
+```
+vars {
+  baseUrl: https://api-dev.example.com
+  timeout: 30000
+  retries: 3
+}
+```
+
+#### environments/staging.bru
+```
+vars {
+  baseUrl: https://api-staging.example.com
+  timeout: 30000
+  retries: 2
+}
+```
+
+#### environments/prod.bru
+```
+vars {
+  baseUrl: https://api.example.com
+  timeout: 60000
+  retries: 1
+}
+```
+
+## 3. Data Files
+
+### data/users.json
+```json
+{
+  "validUsers": [
+    {
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "age": 30,
+      "role": "admin"
+    },
+    {
+      "name": "Jane Smith",
+      "email": "jane.smith@example.com",
+      "age": 25,
+      "role": "user"
+    }
+  ],
+  "invalidUsers": [
+    {
+      "name": "",
+      "email": "invalid-email",
+      "age": -5,
+      "role": "unknown"
+    },
+    {
+      "name": "Test User",
+      "email": "test@test.com",
+      "age": "invalid",
+      "role": ""
+    }
+  ]
+}
+```
+
+### data/products.json
+```json
+{
+  "validProducts": [
+    {
+      "name": "Laptop",
+      "price": 999.99,
+      "category": "Electronics",
+      "inStock": true
+    },
+    {
+      "name": "Book",
+      "price": 19.99,
+      "category": "Education",
+      "inStock": true
+    }
+  ],
+  "invalidProducts": [
+    {
+      "name": "",
+      "price": -100,
+      "category": "",
+      "inStock": "invalid"
+    }
+  ]
+}
+```
+
+## 4. Bruno Test Files
+
+### tests/users/create-user.bru
+```
+meta {
+  name: Create User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/users
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "name": "{{userData.name}}",
+    "email": "{{userData.email}}",
+    "age": {{userData.age}},
+    "role": "{{userData.role}}"
+  }
+}
+
+vars:pre-request {
+  userData: {}
+}
+
+script:pre-request {
+  // This will be populated by the test runner
+  const testData = bru.getEnvVar("currentTestData");
+  if (testData) {
+    bru.setVar("userData", JSON.parse(testData));
+  }
+}
+
+tests {
+  test("Status code should be 201 for valid user", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  
+  test("Response should contain user ID", function() {
+    expect(res.getBody()).to.have.property('id');
+  });
+  
+  test("Response should contain correct user data", function() {
+    const body = res.getBody();
+    const userData = JSON.parse(bru.getEnvVar("currentTestData"));
+    expect(body.name).to.equal(userData.name);
+    expect(body.email).to.equal(userData.email);
+  });
+  
+  test("Response time should be less than 2000ms", function() {
+    expect(res.getResponseTime()).to.be.below(2000);
+  });
+}
+```
+
+### tests/users/get-users.bru
+```
+meta {
+  name: Get Users
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/users
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("Status code should be 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response should be an array", function() {
+    expect(res.getBody()).to.be.an('array');
+  });
+  
+  test("Each user should have required fields", function() {
+    const users = res.getBody();
+    users.forEach(user => {
+      expect(user).to.have.property('id');
+      expect(user).to.have.property('name');
+      expect(user).to.have.property('email');
+    });
+  });
+}
+```
+
+## 5. Test Runner Script
+
+### scripts/test-runner.js
+```javascript
+const { execSync } = require('child_process');
+const fs = require('fs-extra');
+const path = require('path');
+const yargs = require('yargs');
+const chalk = require('chalk');
+
+class BrunoTestRunner {
+  constructor(options = {}) {
+    this.environment = options.environment || 'dev';
+    this.collection = options.collection || './collections/api-tests';
+    this.dataDir = path.join(this.collection, 'data');
+    this.resultsDir = './test-results';
+    this.testResults = [];
+  }
+
+  async loadTestData(filename) {
+    const filePath = path.join(this.dataDir, filename);
+    if (await fs.pathExists(filePath)) {
+      return await fs.readJson(filePath);
+    }
+    return {};
+  }
+
+  async runDataDrivenTests(testFile, dataSet, dataKey) {
+    console.log(chalk.blue(`Running data-driven tests for: ${testFile}`));
+    
+    for (let i = 0; i < dataSet.length; i++) {
+      const testData = dataSet[i];
+      console.log(chalk.yellow(`  Test iteration ${i + 1}/${dataSet.length}`));
+      
+      try {
+        // Set environment variable with current test data
+        process.env.BRUNO_TEST_DATA = JSON.stringify(testData);
+        
+        const result = await this.runSingleTest(testFile, {
+          currentTestData: JSON.stringify(testData),
+          testIteration: i + 1,
+          dataKey: dataKey
+        });
+        
+        this.testResults.push({
+          testFile,
+          iteration: i + 1,
+          dataKey,
+          testData,
+          result,
+          timestamp: new Date().toISOString()
+        });
+        
+      } catch (error) {
+        console.error(chalk.red(`  Error in iteration ${i + 1}:`, error.message));
+        this.testResults.push({
+          testFile,
+          iteration: i + 1,
+          dataKey,
+          testData,
+          result: { success: false, error: error.message },
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  async runSingleTest(testFile, envVars = {}) {
+    const envString = Object.entries(envVars)
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(' ');
+    
+    const command = `${envString} bru run ${testFile} --env ${this.environment} --output json`;
+    
+    try {
+      const output = execSync(command, { 
+        cwd: this.collection,
+        encoding: 'utf8',
+        timeout: 30000
+      });
+      
+      return {
+        success: true,
+        output: output,
+        command: command
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        command: command
+      };
+    }
+  }
+
+  async runTestSuite() {
+    console.log(chalk.green(`Starting Bruno Test Suite - Environment: ${this.environment}`));
+    
+    await fs.ensureDir(this.resultsDir);
+    
+    // Load test configurations
+    const testConfig = {
+      'tests/users/create-user.bru': {
+        dataFile: 'users.json',
+        dataSets: ['validUsers', 'invalidUsers']
+      },
+      'tests/products/create-product.bru': {
+        dataFile: 'products.json',
+        dataSets: ['validProducts', 'invalidProducts']
+      }
+    };
+
+    // Run data-driven tests
+    for (const [testFile, config] of Object.entries(testConfig)) {
+      const testData = await this.loadTestData(config.dataFile);
+      
+      for (const dataSetKey of config.dataSets) {
+        if (testData[dataSetKey] && testData[dataSetKey].length > 0) {
+          await this.runDataDrivenTests(testFile, testData[dataSetKey], dataSetKey);
+        }
+      }
+    }
+
+    // Run regular tests (non-data-driven)
+    const regularTests = [
+      'tests/users/get-users.bru',
+      'tests/auth/login.bru'
+    ];
+
+    for (const testFile of regularTests) {
+      console.log(chalk.blue(`Running regular test: ${testFile}`));
+      const result = await this.runSingleTest(testFile);
+      this.testResults.push({
+        testFile,
+        iteration: 1,
+        dataKey: 'regular',
+        testData: null,
+        result,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Save results
+    await this.saveResults();
+    this.printSummary();
+  }
+
+  async saveResults() {
+    const resultsFile = path.join(this.resultsDir, `results-${Date.now()}.json`);
+    await fs.writeJson(resultsFile, {
+      environment: this.environment,
+      timestamp: new Date().toISOString(),
+      results: this.testResults
+    }, { spaces: 2 });
+    
+    console.log(chalk.green(`Results saved to: ${resultsFile}`));
+  }
+
+  printSummary() {
+    const total = this.testResults.length;
+    const passed = this.testResults.filter(r => r.result.success).length;
+    const failed = total - passed;
+    
+    console.log(chalk.green('\n=== Test Summary ==='));
+    console.log(`Total Tests: ${total}`);
+    console.log(chalk.green(`Passed: ${passed}`));
+    console.log(chalk.red(`Failed: ${failed}`));
+    console.log(`Success Rate: ${((passed/total) * 100).toFixed(2)}%`);
+  }
+}
+
+// CLI Setup
+const argv = yargs
+  .option('env', {
+    alias: 'environment',
+    description: 'Test environment',
+    choices: ['dev', 'staging', 'prod'],
+    default: 'dev'
+  })
+  .option('collection', {
+    alias: 'c',
+    description: 'Path to Bruno collection',
+    default: './collections/api-tests'
+  })
+  .help()
+  .argv;
+
+// Run tests
+const runner = new BrunoTestRunner({
+  environment: argv.env,
+  collection: argv.collection
+});
+
+runner.runTestSuite().catch(console.error);
+```
+
+## 6. HTML Report Generator
+
+### scripts/report-generator.js
+```javascript
+const fs = require('fs-extra');
+const path = require('path');
+const Handlebars = require('handlebars');
+const moment = require('moment');
+
+class HTMLReportGenerator {
+  constructor() {
+    this.resultsDir = './test-results';
+    this.reportsDir = './reports/html';
+    this.templateDir = './scripts/templates';
+  }
+
+  async generateReport() {
+    await fs.ensureDir(this.reportsDir);
+    
+    // Get latest results file
+    const resultFiles = await fs.readdir(this.resultsDir);
+    const latestFile = resultFiles
+      .filter(f => f.startsWith('results-'))
+      .sort()
+      .pop();
+    
+    if (!latestFile) {
+      console.error('No test results found');
+      return;
+    }
+
+    const resultsPath = path.join(this.resultsDir, latestFile);
+    const testData = await fs.readJson(resultsPath);
+    
+    // Generate HTML report
+    const htmlContent = await this.createHTMLReport(testData);
+    const reportPath = path.join(this.reportsDir, `report-${Date.now()}.html`);
+    
+    await fs.writeFile(reportPath, htmlContent);
+    console.log(`HTML Report generated: ${reportPath}`);
+  }
+
+  async createHTMLReport(testData) {
+    const template = this.getHTMLTemplate();
+    const compile = Handlebars.compile(template);
+    
+    // Process data for template
+    const processedData = this.processTestData(testData);
+    
+    return compile(processedData);
+  }
+
+  processTestData(testData) {
+    const results = testData.results;
+    const total = results.length;
+    const passed = results.filter(r => r.result.success).length;
+    const failed = total - passed;
+    
+    // Group results by test file
+    const groupedResults = {};
+    results.forEach(result => {
+      if (!groupedResults[result.testFile]) {
+        groupedResults[result.testFile] = [];
+      }
+      groupedResults[result.testFile].push(result);
+    });
+
+    return {
+      environment: testData.environment,
+      timestamp: moment(testData.timestamp).format('YYYY-MM-DD HH:mm:ss'),
+      summary: {
+        total,
+        passed,
+        failed,
+        successRate: ((passed/total) * 100).toFixed(2)
+      },
+      testFiles: Object.keys(groupedResults).map(testFile => ({
+        name: testFile,
+        results: groupedResults[testFile].map(r => ({
+          ...r,
+          formattedTimestamp: moment(r.timestamp).format('HH:mm:ss'),
+          statusClass: r.result.success ? 'success' : 'failure'
+        }))
+      }))
+    };
+  }
+
+  getHTMLTemplate() {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bruno API Test Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header .meta {
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            border-bottom: 1px solid #eee;
+        }
+        .summary-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .summary-card.passed {
+            background: #d4edda;
+            color: #155724;
+        }
+        .summary-card.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .summary-card h3 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .summary-card p {
+            margin: 5px 0 0 0;
+            font-weight: 500;
+        }
+        .test-results {
+            padding: 30px;
+        }
+        .test-file {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .test-file-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+            font-weight: 600;
+        }
+        .test-iteration {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .test-iteration:last-child {
+            border-bottom: none;
+        }
+        .test-iteration.success {
+            border-left: 4px solid #28a745;
+        }
+        .test-iteration.failure {
+            border-left: 4px solid #dc3545;
+        }
+        .iteration-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-badge.success {
+            background: #28a745;
+            color: white;
+        }
+        .status-badge.failure {
+            background: #dc3545;
+            color: white;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .collapsible {
+            cursor: pointer;
+        }
+        .collapsible:hover {
+            background-color: #e9ecef;
+        }
+        .content {
+            display: none;
+        }
+        .content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Bruno API Test Report</h1>
+            <div class="meta">
+                <div>Environment: <strong>{{environment}}</strong></div>
+                <div>Generated: {{timestamp}}</div>
+            </div>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-card">
+                <h3>{{summary.total}}</h3>
+                <p>Total Tests</p>
+            </div>
+            <div class="summary-card passed">
+                <h3>{{summary.passed}}</h3>
+                <p>Passed</p>
+            </div>
+            <div class="summary-card failed">
+                <h3>{{summary.failed}}</h3>
+                <p>Failed</p>
+            </div>
+            <div class="summary-card">
+                <h3>{{summary.successRate}}%</h3>
+                <p>Success Rate</p>
+            </div>
+        </div>
+        
+        <div class="test-results">
+            {{#each testFiles}}
+            <div class="test-file">
+                <div class="test-file-header collapsible" onclick="toggleContent('{{@index}}')">
+                    📁 {{name}} ({{results.length}} iterations)
+                </div>
+                <div id="content-{{@index}}" class="content">
+                    {{#each results}}
+                    <div class="test-iteration {{statusClass}}">
+                        <div class="iteration-header">
+                            <div>
+                                <strong>Iteration {{iteration}}</strong>
+                                {{#if dataKey}}
+                                - Data Set: {{dataKey}}
+                                {{/if}}
+                            </div>
+                            <div>
+                                <span class="status-badge {{statusClass}}">
+                                    {{#if result.success}}PASS{{else}}FAIL{{/if}}
+                                </span>
+                                <small>{{formattedTimestamp}}</small>
+                            </div>
+                        </div>
+                        
+                        {{#if testData}}
+                        <div class="test-data">
+                            <strong>Test Data:</strong>
+                            <pre>{{json testData}}</pre>
+                        </div>
+                        {{/if}}
+                        
+                        {{#unless result.success}}
+                        <div class="error-message">
+                            <strong>Error:</strong> {{result.error}}
+                        </div>
+                        {{/unless}}
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+    
+    <script>
+        function toggleContent(index) {
+            const content = document.getElementById('content-' + index);
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+            } else {
+                content.classList.add('active');
+            }
+        }
+        
+        // Auto-expand failed tests
+        document.addEventListener('DOMContentLoaded', function() {
+            const failedTests = document.querySelectorAll('.test-iteration.failure');
+            failedTests.forEach(test => {
+                const fileContent = test.closest('.content');
+                if (fileContent) {
+                    fileContent.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+    `;
+  }
+}
+
+// Register Handlebars helper for JSON formatting
+Handlebars.registerHelper('json', function(context) {
+  return JSON.stringify(context, null, 2);
+});
+
+// Run report generation
+const generator = new HTMLReportGenerator();
+generator.generateReport().catch(console.error);
+```
+
+## 7. Usage Instructions
+
+### Setup
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Install Bruno CLI globally:
+   ```bash
+   npm install -g @usebruno/cli
+   ```
+
+### Running Tests
+```bash
+# Run tests in development environment
+npm run test:dev
+
+# Run tests in staging environment
+npm run test:staging
+
+# Run tests in production environment
+npm run test:prod
+
+# Run tests and generate HTML report
+npm run test-and-report
+```
+
+### Features
+
+1. **Data-Driven Testing**: Tests automatically iterate through different data sets
+2. **Environment Management**: Support for multiple environments (dev, staging, prod)
+3. **Rich HTML Reports**: Detailed reports with success/failure rates, test data, and error messages
+4. **Flexible Test Organization**: Organized by feature/module
+5. **Error Handling**: Comprehensive error handling and reporting
+6. **Extensible**: Easy to add new tests and data sets
+
+### Adding New Tests
+
+1. Create new `.bru` files in the appropriate directory
+2. Add corresponding test data in the `data/` directory
+3. Update the test runner configuration to include your new tests
+4. Follow the data-driven pattern for dynamic testing
+
+This framework provides a robust foundation for API testing with Bruno, combining the simplicity of Bruno's syntax with powerful data-driven testing capabilities and professional HTML reporting.
