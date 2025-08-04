@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cucumber Excel Configuration Sample</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e8f4fd;
+        }
+        .sheet-name {
+            background-color: #2ecc71;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .download-section {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .download-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .download-btn:hover {
+            background-color: #219a52;
+        }
+        .instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .note {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🥒 Cucumber Excel Configuration Sample</h1>
+        
+        <div class="instructions">
+            <strong>Instructions:</strong> Create an Excel file named "cucumber_config.xlsx" with the following three sheets. 
+            Copy the data from each table below into the corresponding Excel sheet.
+        </div>
+
+        <h2>📋 Sheet 1: Tags</h2>
+        <div class="sheet-name">Sheet Name: Tags</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>FeatureFile</th>
+                    <th>ScenarioName</th>
+                    <th>TagsToAdd</th>
+                    <th>ApplyToScenarios</th>
+                    <th>ApplyToOutlines</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>login.feature</td>
+                    <td>Valid Login</td>
+                    <td>smoke,critical</td>
+                    <td>TRUE</td>
+                    <td>FALSE</td>
+                </tr>
+                <tr>
+                    <td>login.feature</td>
+                    <td>Multiple Login Attempts</td>
+                    <td>regression,data-driven</td>
+                    <td>FALSE</td>
+                    <td>TRUE</td>
+                </tr>
+                <tr>
+                    <td>registration.feature</td>
+                    <td></td>
+                    <td>regression,functional</td>
+                    <td>TRUE</td>
+                    <td>TRUE</td>
+                </tr>
+                <tr>
+                    <td>checkout.feature</td>
+                    <td>Purchase Items</td>
+                    <td>e2e,payment</td>
+                    <td>FALSE</td>
+                    <td>TRUE</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Note:</strong> 
+            <ul>
+                <li>Leave ScenarioName empty to apply tags to all scenarios in the feature file</li>
+                <li>Use comma-separated values for multiple tags</li>
+                <li>Use TRUE/FALSE for boolean columns</li>
+            </ul>
+        </div>
+
+        <h2>🔄 Sheet 2: ExampleModifications</h2>
+        <div class="sheet-name">Sheet Name: ExampleModifications</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>FeatureFile</th>
+                    <th>ScenarioName</th>
+                    <th>ColumnName</th>
+                    <th>OldValue</th>
+                    <th>NewValue</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>login.feature</td>
+                    <td>Multiple Login Attempts</td>
+                    <td>username</td>
+                    <td>oldUser</td>
+                    <td>newUser</td>
+                </tr>
+                <tr>
+                    <td>login.feature</td>
+                    <td>Multiple Login Attempts</td>
+                    <td>expected</td>
+                    <td>failure</td>
+                    <td>error</td>
+                </tr>
+                <tr>
+                    <td>login.feature</td>
+                    <td>Multiple Login Attempts</td>
+                    <td>password</td>
+                    <td>pass123</td>
+                    <td>newPass123</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Note:</strong> This sheet is used to modify existing values in example tables. 
+            It will find the specified old value in the given column and replace it with the new value.
+        </div>
+
+        <h2>📊 Sheet 3: ExampleTables</h2>
+        <div class="sheet-name">Sheet Name: ExampleTables</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>FeatureFile</th>
+                    <th>ScenarioName</th>
+                    <th>DataType</th>
+                    <th>Col1</th>
+                    <th>Col2</th>
+                    <th>Col3</th>
+                    <th>Col4</th>
+                    <th>Col5</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>checkout.feature</td>
+                    <td>Purchase Items</td>
+                    <td>HEADER</td>
+                    <td>item</td>
+                    <td>quantity</td>
+                    <td>price</td>
+                    <td>expected</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>checkout.feature</td>
+                    <td>Purchase Items</td>
+                    <td>DATA</td>
+                    <td>laptop</td>
+                    <td>1</td>
+                    <td>1000</td>
+                    <td>success</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>checkout.feature</td>
+                    <td>Purchase Items</td>
+                    <td>DATA</td>
+                    <td>phone</td>
+                    <td>2</td>
+                    <td>800</td>
+                    <td>success</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>checkout.feature</td>
+                    <td>Purchase Items</td>
+                    <td>DATA</td>
+                    <td>tablet</td>
+                    <td>1</td>
+                    <td>500</td>
+                    <td>success</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>user.feature</td>
+                    <td>User Profile Management</td>
+                    <td>HEADER</td>
+                    <td>action</td>
+                    <td>field</td>
+                    <td>value</td>
+                    <td>result</td>
+                    <td>message</td>
+                </tr>
+                <tr>
+                    <td>user.feature</td>
+                    <td>User Profile Management</td>
+                    <td>DATA</td>
+                    <td>update</td>
+                    <td>email</td>
+                    <td>new@email.com</td>
+                    <td>success</td>
+                    <td>Profile updated</td>
+                </tr>
+                <tr>
+                    <td>user.feature</td>
+                    <td>User Profile Management</td>
+                    <td>DATA</td>
+                    <td>update</td>
+                    <td>phone</td>
+                    <td>+1234567890</td>
+                    <td>success</td>
+                    <td>Phone updated</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Note:</strong> 
+            <ul>
+                <li>Use "HEADER" in DataType column for header row</li>
+                <li>Use "DATA" in DataType column for data rows</li>
+                <li>You can add more columns (Col6, Col7, etc.) as needed</li>
+                <li>Each scenario can have one HEADER row followed by multiple DATA rows</li>
+            </ul>
+        </div>
+
+        <div class="download-section">
+            <h3>📥 Download Options</h3>
+            <p>You can create the Excel file in two ways:</p>
+            
+            <button class="download-btn" onclick="downloadCSV('tags')">Download Tags Sheet as CSV</button>
+            <button class="download-btn" onclick="downloadCSV('modifications')">Download Modifications Sheet as CSV</button>
+            <button class="download-btn" onclick="downloadCSV('tables')">Download Tables Sheet as CSV</button>
+            
+            <div style="margin-top: 20px;">
+                <strong>Or copy the data manually:</strong>
+                <ol style="text-align: left; display: inline-block;">
+                    <li>Create a new Excel file named "cucumber_config.xlsx"</li>
+                    <li>Create three sheets: "Tags", "ExampleModifications", "ExampleTables"</li>
+                    <li>Copy the data from each table above into the corresponding sheet</li>
+                    <li>Save the file and use it with the Java code</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>🎯 Sample Feature Files</h3>
+            <p>The Java code will also create sample feature files (login.feature, registration.feature, checkout.feature) 
+            that work with this Excel configuration. When you run the main method, it will:</p>
+            <ol>
+                <li>Create the sample Excel file automatically</li>
+                <li>Create sample feature files</li>
+                <li>Process all configurations and update the feature files</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function downloadCSV(type) {
+            let csvContent = '';
+            let filename = '';
+            
+            if (type === 'tags') {
+                csvContent = `FeatureFile,ScenarioName,TagsToAdd,ApplyToScenarios,ApplyToOutlines
+login.feature,Valid Login,"smoke,critical",TRUE,FALSE
+login.feature,Multiple Login Attempts,"regression,data-driven",FALSE,TRUE
+registration.feature,,"regression,functional",TRUE,TRUE
+checkout.feature,Purchase Items,"e2e,payment",FALSE,TRUE`;
+                filename = 'tags.csv';
+            } else if (type === 'modifications') {
+                csvContent = `FeatureFile,ScenarioName,ColumnName,OldValue,NewValue
+login.feature,Multiple Login Attempts,username,oldUser,newUser
+login.feature,Multiple Login Attempts,expected,failure,error
+login.feature,Multiple Login Attempts,password,pass123,newPass123`;
+                filename = 'example_modifications.csv';
+            } else if (type === 'tables') {
+                csvContent = `FeatureFile,ScenarioName,DataType,Col1,Col2,Col3,Col4,Col5
+checkout.feature,Purchase Items,HEADER,item,quantity,price,expected,
+checkout.feature,Purchase Items,DATA,laptop,1,1000,success,
+checkout.feature,Purchase Items,DATA,phone,2,800,success,
+checkout.feature,Purchase Items,DATA,tablet,1,500,success,
+user.feature,User Profile Management,HEADER,action,field,value,result,message
+user.feature,User Profile Management,DATA,update,email,new@email.com,success,Profile updated
+user.feature,User Profile Management,DATA,update,phone,+1234567890,success,Phone updated`;
+                filename = 'example_tables.csv';
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
