@@ -1,0 +1,748 @@
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.regex.*;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+
+/**
+ * Enhanced Cucumber Tag Manager that reads configuration from Excel files
+ */
+public class CucumberExcelTagManager {
+    
+    private static final String SCENARIO_PATTERN = "^(\\s*)(Scenario|Scenario Outline)(:.*?)$";
+    private static final String TAG_PATTERN = "^(\\s*)@.*$";
+    private static final String EXAMPLES_PATTERN = "^(\\s*)Examples:.*$";
+    private static final String PIPE_PATTERN = "^(\\s*)\\|.*\\|\\s*$";
+    
+    /**
+     * Data class to hold tag configuration from Excel
+     */
+    public static class TagConfig {
+        public String featureFile;
+        public String scenarioName;
+        public String tagsToAdd;
+        public boolean applyToScenarios;
+        public boolean applyToOutlines;
+        
+        public TagConfig(String featureFile, String scenarioName, String tagsToAdd, 
+                        boolean applyToScenarios, boolean applyToOutlines) {
+            this.featureFile = featureFile;
+            this.scenarioName = scenarioName;
+            this.tagsToAdd = tagsToAdd;
+            this.applyToScenarios = applyToScenarios;
+            this.applyToOutlines = applyToOutlines;
+        }
+    }
+    
+    /**
+     * Data class to hold example modification configuration from Excel
+     */
+    public static class ExampleConfig {
+        public String featureFile;
+        public String scenarioName;
+        public String columnName;
+        public String oldValue;
+        public String newValue;
+        
+        public ExampleConfig(String featureFile, String scenarioName, String columnName,
+                           String oldValue, String newValue) {
+            this.featureFile = featureFile;
+            this.scenarioName = scenarioName;
+            this.columnName = columnName;
+            this.oldValue = oldValue;
+            this.newValue = newValue;
+        }
+    }
+    
+    /**
+     * Data class to hold example table configuration from Excel
+     */
+    public static class ExampleTableConfig {
+        public String featureFile;
+        public String scenarioName;
+        public List<String> headers;
+        public List<List<String>> rows;
+        
+        public ExampleTableConfig(String featureFile, String scenarioName) {
+            this.featureFile = featureFile;
+            this.scenarioName = scenarioName;
+            this.headers = new ArrayList<>();
+            this.rows = new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Reads Excel file and processes all configurations
+     */
+    public static void processExcelConfiguration(String excelFilePath) throws IOException {
+        try (FileInputStream fis = new FileInputStream(excelFilePath);
+             Workbook workbook = createWorkbook(excelFilePath, fis)) {
+            
+            // Process Tags sheet
+            Sheet tagSheet = workbook.getSheet("Tags");
+            if (tagSheet != null) {
+                List<TagConfig> tagConfigs = readTagConfigurations(tagSheet);
+                processTagConfigurations(tagConfigs);
+            }
+            
+            // Process Example Modifications sheet
+            Sheet exampleModSheet = workbook.getSheet("ExampleModifications");
+            if (exampleModSheet != null) {
+                List<ExampleConfig> exampleConfigs = readExampleConfigurations(exampleModSheet);
+                processExampleConfigurations(exampleConfigs);
+            }
+            
+            // Process Example Tables sheet
+            Sheet exampleTableSheet = workbook.getSheet("ExampleTables");
+            if (exampleTableSheet != null) {
+                Map<String, ExampleTableConfig> tableConfigs = readExampleTableConfigurations(exampleTableSheet);
+                processExampleTableConfigurations(tableConfigs);
+            }
+        }
+    }
+    
+    /**
+     * Creates appropriate workbook based on file extension
+     */
+    private static Workbook createWorkbook(String filePath, FileInputStream fis) throws IOException {
+        if (filePath.endsWith(".xlsx")) {
+            return new XSSFWorkbook(fis);
+        } else if (filePath.endsWith(".xls")) {
+            return new HSSFWorkbook(fis);
+        } else {
+            throw new IllegalArgumentException("Unsupported file format. Use .xlsx or .xls");
+        }
+    }
+    
+    /**
+     * Reads tag configurations from Excel sheet
+     */
+    private static List<TagConfig> readTagConfigurations(Sheet sheet) {
+        List<TagConfig> configs = new ArrayList<>();
+        Iterator<Row> rowIterator = sheet.iterator();
+        
+        // Skip header row
+        if (rowIterator.hasNext()) {
+            rowIterator.next();
+        }
+        
+        while (rowIterator.hasNext()) {
+            Row row = rowIterator.next();
+            if (isRowEmpty(row)) continue;
+            
+            String featureFile = getCellValueAsString(row.getCell(0));
+            String scenarioName = getCellValueAsString(row.getCell(1));
+            String tagsToAdd = getCellValueAsString(row.getCell(2));
+            boolean applyToScenarios = getCellValueAsBoolean(row.getCell(3));
+            boolean applyToOutlines = getCellValueAsBoolean(row.getCell(4));
+            
+            if (featureFile != null && !featureFile.trim().isEmpty()) {
+                configs.add(new TagConfig(featureFile.trim(), 
+                                        scenarioName != null ? scenarioName.trim() : null,
+                                        tagsToAdd != null ? tagsToAdd.trim() : "",
+                                        applyToScenarios, applyToOutlines));
+            }
+        }
+        
+        return configs;
+    }
+    
+    /**
+     * Reads example modification configurations from Excel sheet
+     */
+    private static List<ExampleConfig> readExampleConfigurations(Sheet sheet) {
+        List<ExampleConfig> configs = new ArrayList<>();
+        Iterator<Row> rowIterator = sheet.iterator();
+        
+        // Skip header row
+        if (rowIterator.hasNext()) {
+            rowIterator.next();
+        }
+        
+        while (rowIterator.hasNext()) {
+            Row row = rowIterator.next();
+            if (isRowEmpty(row)) continue;
+            
+            String featureFile = getCellValueAsString(row.getCell(0));
+            String scenarioName = getCellValueAsString(row.getCell(1));
+            String columnName = getCellValueAsString(row.getCell(2));
+            String oldValue = getCellValueAsString(row.getCell(3));
+            String newValue = getCellValueAsString(row.getCell(4));
+            
+            if (featureFile != null && !featureFile.trim().isEmpty()) {
+                configs.add(new ExampleConfig(featureFile.trim(),
+                                            scenarioName != null ? scenarioName.trim() : "",
+                                            columnName != null ? columnName.trim() : "",
+                                            oldValue != null ? oldValue.trim() : "",
+                                            newValue != null ? newValue.trim() : ""));
+            }
+        }
+        
+        return configs;
+    }
+    
+    /**
+     * Reads example table configurations from Excel sheet
+     */
+    private static Map<String, ExampleTableConfig> readExampleTableConfigurations(Sheet sheet) {
+        Map<String, ExampleTableConfig> configs = new HashMap<>();
+        Iterator<Row> rowIterator = sheet.iterator();
+        
+        // Skip header row
+        if (rowIterator.hasNext()) {
+            rowIterator.next();
+        }
+        
+        while (rowIterator.hasNext()) {
+            Row row = rowIterator.next();
+            if (isRowEmpty(row)) continue;
+            
+            String featureFile = getCellValueAsString(row.getCell(0));
+            String scenarioName = getCellValueAsString(row.getCell(1));
+            String dataType = getCellValueAsString(row.getCell(2)); // "HEADER" or "DATA"
+            
+            if (featureFile == null || scenarioName == null || dataType == null) continue;
+            
+            String key = featureFile.trim() + "|" + scenarioName.trim();
+            ExampleTableConfig config = configs.computeIfAbsent(key, 
+                k -> new ExampleTableConfig(featureFile.trim(), scenarioName.trim()));
+            
+            if ("HEADER".equalsIgnoreCase(dataType.trim())) {
+                // Read headers from columns 3 onwards
+                for (int i = 3; i < row.getLastCellNum(); i++) {
+                    String header = getCellValueAsString(row.getCell(i));
+                    if (header != null && !header.trim().isEmpty()) {
+                        config.headers.add(header.trim());
+                    }
+                }
+            } else if ("DATA".equalsIgnoreCase(dataType.trim())) {
+                // Read data row from columns 3 onwards
+                List<String> dataRow = new ArrayList<>();
+                for (int i = 3; i < row.getLastCellNum(); i++) {
+                    String cellValue = getCellValueAsString(row.getCell(i));
+                    dataRow.add(cellValue != null ? cellValue.trim() : "");
+                }
+                if (!dataRow.isEmpty()) {
+                    config.rows.add(dataRow);
+                }
+            }
+        }
+        
+        return configs;
+    }
+    
+    /**
+     * Processes tag configurations
+     */
+    private static void processTagConfigurations(List<TagConfig> configs) {
+        for (TagConfig config : configs) {
+            try {
+                if (!config.tagsToAdd.isEmpty()) {
+                    List<String> tags = Arrays.asList(config.tagsToAdd.split(","));
+                    tags = tags.stream().map(String::trim).collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+                    
+                    addTagsToScenarios(config.featureFile, tags, 
+                                     config.scenarioName.isEmpty() ? null : config.scenarioName,
+                                     config.applyToOutlines, config.applyToScenarios);
+                    
+                    System.out.println("Added tags to " + config.featureFile + 
+                                     (config.scenarioName.isEmpty() ? "" : " for scenario: " + config.scenarioName));
+                }
+            } catch (IOException e) {
+                System.err.println("Error processing tags for " + config.featureFile + ": " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Processes example modification configurations
+     */
+    private static void processExampleConfigurations(List<ExampleConfig> configs) {
+        for (ExampleConfig config : configs) {
+            try {
+                if (!config.columnName.isEmpty() && !config.oldValue.isEmpty()) {
+                    modifyExampleValue(config.featureFile, config.scenarioName, 
+                                     config.columnName, config.oldValue, config.newValue);
+                    
+                    System.out.println("Modified example value in " + config.featureFile + 
+                                     " for scenario: " + config.scenarioName);
+                }
+            } catch (IOException e) {
+                System.err.println("Error modifying example in " + config.featureFile + ": " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Processes example table configurations
+     */
+    private static void processExampleTableConfigurations(Map<String, ExampleTableConfig> configs) {
+        for (ExampleTableConfig config : configs.values()) {
+            try {
+                if (!config.headers.isEmpty() && !config.rows.isEmpty()) {
+                    addOrModifyExampleTable(config.featureFile, config.scenarioName, 
+                                          config.headers, config.rows);
+                    
+                    System.out.println("Added/Modified example table in " + config.featureFile + 
+                                     " for scenario: " + config.scenarioName);
+                }
+            } catch (IOException e) {
+                System.err.println("Error processing example table in " + config.featureFile + ": " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Utility methods for Excel cell handling
+     */
+    private static String getCellValueAsString(Cell cell) {
+        if (cell == null) return null;
+        
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                } else {
+                    return String.valueOf((long) cell.getNumericCellValue());
+                }
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            default:
+                return null;
+        }
+    }
+    
+    private static boolean getCellValueAsBoolean(Cell cell) {
+        if (cell == null) return false;
+        
+        switch (cell.getCellType()) {
+            case BOOLEAN:
+                return cell.getBooleanCellValue();
+            case STRING:
+                String value = cell.getStringCellValue().toLowerCase().trim();
+                return "true".equals(value) || "yes".equals(value) || "1".equals(value);
+            case NUMERIC:
+                return cell.getNumericCellValue() != 0;
+            default:
+                return false;
+        }
+    }
+    
+    private static boolean isRowEmpty(Row row) {
+        if (row == null) return true;
+        
+        for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
+            Cell cell = row.getCell(i);
+            if (cell != null && cell.getCellType() != CellType.BLANK) {
+                String value = getCellValueAsString(cell);
+                if (value != null && !value.trim().isEmpty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * Creates sample Excel configuration file
+     */
+    public static void createSampleExcelFile(String excelFilePath) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            
+            // Create Tags sheet
+            Sheet tagSheet = workbook.createSheet("Tags");
+            createTagSheet(tagSheet);
+            
+            // Create ExampleModifications sheet
+            Sheet exampleModSheet = workbook.createSheet("ExampleModifications");
+            createExampleModificationSheet(exampleModSheet);
+            
+            // Create ExampleTables sheet
+            Sheet exampleTableSheet = workbook.createSheet("ExampleTables");
+            createExampleTableSheet(exampleTableSheet);
+            
+            // Write to file
+            try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
+                workbook.write(fos);
+            }
+        }
+    }
+    
+    private static void createTagSheet(Sheet sheet) {
+        // Create header row
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("FeatureFile");
+        headerRow.createCell(1).setCellValue("ScenarioName");
+        headerRow.createCell(2).setCellValue("TagsToAdd");
+        headerRow.createCell(3).setCellValue("ApplyToScenarios");
+        headerRow.createCell(4).setCellValue("ApplyToOutlines");
+        
+        // Sample data
+        Row row1 = sheet.createRow(1);
+        row1.createCell(0).setCellValue("login.feature");
+        row1.createCell(1).setCellValue("Valid Login");
+        row1.createCell(2).setCellValue("smoke,critical");
+        row1.createCell(3).setCellValue(true);
+        row1.createCell(4).setCellValue(false);
+        
+        Row row2 = sheet.createRow(2);
+        row2.createCell(0).setCellValue("registration.feature");
+        row2.createCell(1).setCellValue("");
+        row2.createCell(2).setCellValue("regression");
+        row2.createCell(3).setCellValue(true);
+        row2.createCell(4).setCellValue(true);
+        
+        // Auto-size columns
+        for (int i = 0; i < 5; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+    
+    private static void createExampleModificationSheet(Sheet sheet) {
+        // Create header row
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("FeatureFile");
+        headerRow.createCell(1).setCellValue("ScenarioName");
+        headerRow.createCell(2).setCellValue("ColumnName");
+        headerRow.createCell(3).setCellValue("OldValue");
+        headerRow.createCell(4).setCellValue("NewValue");
+        
+        // Sample data
+        Row row1 = sheet.createRow(1);
+        row1.createCell(0).setCellValue("login.feature");
+        row1.createCell(1).setCellValue("Multiple Login Attempts");
+        row1.createCell(2).setCellValue("username");
+        row1.createCell(3).setCellValue("oldUser");
+        row1.createCell(4).setCellValue("newUser");
+        
+        Row row2 = sheet.createRow(2);
+        row2.createCell(0).setCellValue("login.feature");
+        row2.createCell(1).setCellValue("Multiple Login Attempts");
+        row2.createCell(2).setCellValue("expected");
+        row2.createCell(3).setCellValue("failure");
+        row2.createCell(4).setCellValue("error");
+        
+        // Auto-size columns
+        for (int i = 0; i < 5; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+    
+    private static void createExampleTableSheet(Sheet sheet) {
+        // Create header row
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("FeatureFile");
+        headerRow.createCell(1).setCellValue("ScenarioName");
+        headerRow.createCell(2).setCellValue("DataType");
+        headerRow.createCell(3).setCellValue("Col1");
+        headerRow.createCell(4).setCellValue("Col2");
+        headerRow.createCell(5).setCellValue("Col3");
+        headerRow.createCell(6).setCellValue("Col4");
+        
+        // Sample headers
+        Row headerDataRow = sheet.createRow(1);
+        headerDataRow.createCell(0).setCellValue("checkout.feature");
+        headerDataRow.createCell(1).setCellValue("Purchase Items");
+        headerDataRow.createCell(2).setCellValue("HEADER");
+        headerDataRow.createCell(3).setCellValue("item");
+        headerDataRow.createCell(4).setCellValue("quantity");
+        headerDataRow.createCell(5).setCellValue("price");
+        headerDataRow.createCell(6).setCellValue("expected");
+        
+        // Sample data rows
+        Row dataRow1 = sheet.createRow(2);
+        dataRow1.createCell(0).setCellValue("checkout.feature");
+        dataRow1.createCell(1).setCellValue("Purchase Items");
+        dataRow1.createCell(2).setCellValue("DATA");
+        dataRow1.createCell(3).setCellValue("laptop");
+        dataRow1.createCell(4).setCellValue("1");
+        dataRow1.createCell(5).setCellValue("1000");
+        dataRow1.createCell(6).setCellValue("success");
+        
+        Row dataRow2 = sheet.createRow(3);
+        dataRow2.createCell(0).setCellValue("checkout.feature");
+        dataRow2.createCell(1).setCellValue("Purchase Items");
+        dataRow2.createCell(2).setCellValue("DATA");
+        dataRow2.createCell(3).setCellValue("phone");
+        dataRow2.createCell(4).setCellValue("2");
+        dataRow2.createCell(5).setCellValue("800");
+        dataRow2.createCell(6).setCellValue("success");
+        
+        // Auto-size columns
+        for (int i = 0; i < 7; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+    
+    // Include all the original methods from CucumberTagManager
+    public static void addTagsToScenarios(String filePath, List<String> tags, 
+                                        String scenarioName, boolean applyToOutlines, 
+                                        boolean applyToScenarios) throws IOException {
+        
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> modifiedLines = new ArrayList<>();
+        
+        Pattern scenarioPattern = Pattern.compile(SCENARIO_PATTERN);
+        Pattern tagPattern = Pattern.compile(TAG_PATTERN);
+        
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            Matcher scenarioMatcher = scenarioPattern.matcher(line);
+            
+            if (scenarioMatcher.matches()) {
+                String indent = scenarioMatcher.group(1);
+                String scenarioType = scenarioMatcher.group(2);
+                String scenarioTitle = scenarioMatcher.group(3);
+                
+                boolean shouldApply = (scenarioType.equals("Scenario") && applyToScenarios) ||
+                                    (scenarioType.equals("Scenario Outline") && applyToOutlines);
+                
+                if (scenarioName != null && !scenarioTitle.toLowerCase().contains(scenarioName.toLowerCase())) {
+                    shouldApply = false;
+                }
+                
+                if (shouldApply) {
+                    boolean hasExistingTags = false;
+                    if (i > 0) {
+                        Matcher tagMatcher = tagPattern.matcher(lines.get(i - 1));
+                        if (tagMatcher.matches()) {
+                            hasExistingTags = true;
+                        }
+                    }
+                    
+                    StringBuilder tagLine = new StringBuilder(indent);
+                    for (String tag : tags) {
+                        tagLine.append("@").append(tag).append(" ");
+                    }
+                    
+                    if (hasExistingTags) {
+                        String lastLine = modifiedLines.get(modifiedLines.size() - 1);
+                        modifiedLines.set(modifiedLines.size() - 1, lastLine + " " + tagLine.toString().trim());
+                    } else {
+                        modifiedLines.add(tagLine.toString().trim());
+                    }
+                }
+            }
+            
+            modifiedLines.add(line);
+        }
+        
+        Files.write(Paths.get(filePath), modifiedLines);
+    }
+    
+    public static void modifyExampleValue(String filePath, String scenarioName, 
+                                        String columnName, String oldValue, String newValue) throws IOException {
+        
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> modifiedLines = new ArrayList<>();
+        
+        Pattern scenarioPattern = Pattern.compile(SCENARIO_PATTERN);
+        Pattern examplesPattern = Pattern.compile(EXAMPLES_PATTERN);
+        Pattern pipePattern = Pattern.compile(PIPE_PATTERN);
+        
+        boolean inTargetScenario = false;
+        boolean inExamplesSection = false;
+        int columnIndex = -1;
+        
+        for (String line : lines) {
+            Matcher scenarioMatcher = scenarioPattern.matcher(line);
+            Matcher examplesMatcher = examplesPattern.matcher(line);
+            Matcher pipeMatcher = pipePattern.matcher(line);
+            
+            if (scenarioMatcher.matches()) {
+                String scenarioTitle = scenarioMatcher.group(3);
+                inTargetScenario = scenarioTitle.toLowerCase().contains(scenarioName.toLowerCase());
+                inExamplesSection = false;
+                columnIndex = -1;
+            }
+            
+            if (examplesMatcher.matches() && inTargetScenario) {
+                inExamplesSection = true;
+            }
+            
+            if (pipeMatcher.matches() && inTargetScenario && inExamplesSection) {
+                String[] cells = line.split("\\|");
+                
+                if (columnIndex == -1) {
+                    for (int i = 0; i < cells.length; i++) {
+                        if (cells[i].trim().equals(columnName)) {
+                            columnIndex = i;
+                            break;
+                        }
+                    }
+                } else {
+                    if (columnIndex < cells.length && cells[columnIndex].trim().equals(oldValue)) {
+                        cells[columnIndex] = " " + newValue + " ";
+                        line = String.join("|", cells);
+                    }
+                }
+            }
+            
+            modifiedLines.add(line);
+        }
+        
+        Files.write(Paths.get(filePath), modifiedLines);
+    }
+    
+    public static void addOrModifyExampleTable(String filePath, String scenarioName, 
+                                             List<String> headers, List<List<String>> rows) throws IOException {
+        
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
+        List<String> modifiedLines = new ArrayList<>();
+        
+        Pattern scenarioPattern = Pattern.compile(SCENARIO_PATTERN);
+        Pattern examplesPattern = Pattern.compile(EXAMPLES_PATTERN);
+        
+        boolean inTargetScenario = false;
+        boolean foundExamples = false;
+        String indent = "    ";
+        
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            Matcher scenarioMatcher = scenarioPattern.matcher(line);
+            Matcher examplesMatcher = examplesPattern.matcher(line);
+            
+            if (scenarioMatcher.matches()) {
+                String scenarioTitle = scenarioMatcher.group(3);
+                inTargetScenario = scenarioTitle.toLowerCase().contains(scenarioName.toLowerCase());
+                foundExamples = false;
+                indent = scenarioMatcher.group(1) + "  ";
+            }
+            
+            if (examplesMatcher.matches() && inTargetScenario) {
+                foundExamples = true;
+                modifiedLines.add(line);
+                
+                StringBuilder headerRow = new StringBuilder(indent + "|");
+                for (String header : headers) {
+                    headerRow.append(" ").append(header).append(" |");
+                }
+                modifiedLines.add(headerRow.toString());
+                
+                for (List<String> row : rows) {
+                    StringBuilder dataRow = new StringBuilder(indent + "|");
+                    for (String cell : row) {
+                        dataRow.append(" ").append(cell).append(" |");
+                    }
+                    modifiedLines.add(dataRow.toString());
+                }
+                
+                i++;
+                while (i < lines.size() && 
+                       (lines.get(i).trim().startsWith("|") || lines.get(i).trim().isEmpty())) {
+                    i++;
+                }
+                i--;
+                continue;
+            }
+            
+            if (inTargetScenario && !foundExamples && 
+                (i == lines.size() - 1 || 
+                 (i + 1 < lines.size() && scenarioPattern.matcher(lines.get(i + 1)).matches()))) {
+                
+                modifiedLines.add(line);
+                modifiedLines.add("");
+                modifiedLines.add(indent + "Examples:");
+                
+                StringBuilder headerRow = new StringBuilder(indent + "  |");
+                for (String header : headers) {
+                    headerRow.append(" ").append(header).append(" |");
+                }
+                modifiedLines.add(headerRow.toString());
+                
+                for (List<String> row : rows) {
+                    StringBuilder dataRow = new StringBuilder(indent + "  |");
+                    for (String cell : row) {
+                        dataRow.append(" ").append(cell).append(" |");
+                    }
+                    modifiedLines.add(dataRow.toString());
+                }
+                continue;
+            }
+            
+            modifiedLines.add(line);
+        }
+        
+        Files.write(Paths.get(filePath), modifiedLines);
+    }
+    
+    /**
+     * Main method demonstrating usage with Excel
+     */
+    public static void main(String[] args) {
+        try {
+            String excelFile = "cucumber_config.xlsx";
+            
+            // Create sample Excel file
+            createSampleExcelFile(excelFile);
+            System.out.println("Created sample Excel configuration file: " + excelFile);
+            
+            // Create sample feature files for testing
+            createSampleFeatureFiles();
+            System.out.println("Created sample feature files");
+            
+            // Process Excel configuration
+            processExcelConfiguration(excelFile);
+            System.out.println("Processed all configurations from Excel file");
+            
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Creates sample feature files for testing
+     */
+    private static void createSampleFeatureFiles() throws IOException {
+        // Create login.feature
+        List<String> loginContent = Arrays.asList(
+            "Feature: User Login",
+            "",
+            "  Scenario: Valid Login",
+            "    Given user is on login page",
+            "    When user enters valid credentials",
+            "    Then user should be logged in",
+            "",
+            "  Scenario Outline: Multiple Login Attempts",
+            "    Given user is on login page",
+            "    When user enters <username> and <password>",
+            "    Then result should be <expected>",
+            "",
+            "    Examples:",
+            "      | username | password | expected |",
+            "      | oldUser  | pass123  | failure  |",
+            "      | valid    | valid    | success  |"
+        );
+        Files.write(Paths.get("login.feature"), loginContent);
+        
+        // Create registration.feature
+        List<String> regContent = Arrays.asList(
+            "Feature: User Registration",
+            "",
+            "  Scenario: Valid Registration",
+            "    Given user is on registration page",
+            "    When user fills valid details",
+            "    Then user should be registered"
+        );
+        Files.write(Paths.get("registration.feature"), regContent);
+        
+        // Create checkout.feature
+        List<String> checkoutContent = Arrays.asList(
+            "Feature: Shopping Cart Checkout",
+            "",
+            "  Scenario Outline: Purchase Items",
+            "    Given user has items in cart",
+            "    When user proceeds to checkout",
+            "    Then purchase should be completed"
+        );
+        Files.write(Paths.get("checkout.feature"), checkoutContent);
+    }
+}
+
